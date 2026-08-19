@@ -1,0 +1,38 @@
+# Workflow xác minh — thay bằng bản giảng viên phát nếu khác
+name: Verify
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight
+        run: make preflight
+
+      - name: Check banned tools
+        run: python3 scripts/check_banned_tools.py
+
+      - name: Start stack
+        run: make up
+
+      - name: Attack scenarios (expect blocked)
+        run: make attack
+
+      - name: Defend verification
+        run: make defend
+
+      - name: Run tests and export evidence
+        run: make verify
+
+      - name: Upload evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence
+          path: evidence/

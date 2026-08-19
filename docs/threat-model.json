@@ -1,0 +1,132 @@
+{
+  "title": "Mô hình đe dọa — Chủ đề G: Phân tách ba miền tin cậy",
+  "version": "1.0",
+  "date": "2026-08-19",
+  "system_description": "Hệ thống nội bộ 3 container: DMZ (nginx), APP (Flask API), DATA (PostgreSQL). ~200 người dùng, không đội ANTT riêng.",
+  "trust_domains": [
+    {"id": "DMZ", "level": "low", "services": ["dmz-web"], "description": "Tiếp xúc người dùng"},
+    {"id": "APP", "level": "medium", "services": ["app-api"], "description": "Logic nghiệp vụ"},
+    {"id": "DATA", "level": "high", "services": ["data-db"], "description": "Cơ sở dữ liệu — tài sản quan trọng nhất"}
+  ],
+  "actors": [
+    {
+      "id": "TA-01",
+      "name": "Kẻ tấn công bên ngoài",
+      "motivation": "Đánh cắp dữ liệu nội bộ, phá hoại uy tín",
+      "capability": "Trung bình — khai thác dịch vụ DMZ, scan mạng nội bộ"
+    },
+    {
+      "id": "TA-02",
+      "name": "Insider / tài khoản bị lộ",
+      "motivation": "Truy cập trái phép dữ liệu nhân sự/tài chính",
+      "capability": "Thấp-trung bình — biết endpoint DMZ, thử leo thang"
+    },
+    {
+      "id": "TA-03",
+      "name": "Container DMZ bị chiếm (RCE)",
+      "motivation": "Pivot sang miền APP/DATA",
+      "capability": "Cao trong miền DMZ — chạy lệnh tùy ý trong container"
+    }
+  ],
+  "assets": [
+    {"id": "A-01", "name": "data-db (PostgreSQL)", "criticality": "critical", "data": "Bản ghi nghiệp vụ"},
+    {"id": "A-02", "name": "app-api", "criticality": "high", "data": "Logic truy vấn DB"},
+    {"id": "A-03", "name": "dmz-web", "criticality": "medium", "data": "Giao diện công khai nội bộ"}
+  ],
+  "threats": [
+    {
+      "id": "T-01",
+      "description": "Container DMZ bị chiếm — pivot trực tiếp tới DB",
+      "actor": "TA-03",
+      "asset": "A-01",
+      "attack_technique": "T1021",
+      "attack_technique_name": "Remote Services",
+      "mitigation": ["Cô lập net_data internal", "Gateway duy nhất APP→DATA", "pg_hba scram-sha-256"],
+      "test": "tests/test_connectivity_matrix.py::TestBlockedFlows::test_dmz_cannot_reach_data_db_directly"
+    },
+    {
+      "id": "T-02",
+      "description": "Luồng đi tắt — bỏ qua gateway giữa DMZ và APP",
+      "actor": "TA-01",
+      "asset": "A-02",
+      "attack_technique": "T1572",
+      "attack_technique_name": "Protocol Tunneling",
+      "mitigation": ["app-api chỉ trên net_app", "Không route DMZ→APP trực tiếp"],
+      "test": "tests/test_connectivity_matrix.py::TestBlockedFlows::test_dmz_cannot_reach_app_api_directly"
+    },
+    {
+      "id": "T-03",
+      "description": "Dịch vụ bind 0.0.0.0 — lộ ra mọi giao diện",
+      "actor": "TA-01",
+      "asset": "A-01",
+      "attack_technique": "T1046",
+      "attack_technique_name": "Network Service Discovery",
+      "mitigation": ["postgres listen_addresses=IP miền DATA", "app-api bind IP miền APP", "host map 127.0.0.1 only"],
+      "test": "tests/test_binding.py::TestServiceBinding::test_postgres_not_listening_on_all_interfaces"
+    }
+  ],
+  "defense_in_depth": {
+    "critical_asset": "A-01",
+    "layers": [
+      {"order": 1, "control": "Docker internal networks", "independent": true},
+      {"order": 2, "control": "Gateway proxy (path/port filter)", "independent": true},
+      {"order": 3, "control": "DB authentication (scram-sha-256 + pg_hba)", "independent": true}
+    ],
+    "residual_risk_when_layer1_breaks": "Kẻ tấn công trong DMZ vẫn bị chặn bởi gateway path filter và DB auth. Chỉ truy cập được /health và /data qua gateway, không SQL trực tiếp."
+  },
+  "cost_analysis": {
+    "currency": "VND",
+    "annual_budget_limit": 30000000,
+    "controls": [
+      {
+        "name": "Phân tách mạng Docker (3 miền + gateway)",
+        "implementation_cost": 0,
+        "annual_cost": 0,
+        "loss_single_incident": 500000000,
+        "frequency_per_year": 0.1,
+        "expected_annual_loss": 50000000,
+        "recommendation": "NÊN — chi phí 0, giảm pivot đáng kể"
+      },
+      {
+        "name": "Gateway nginx/socat (open source)",
+        "implementation_cost": 0,
+        "annual_cost": 0,
+        "loss_single_incident": 300000000,
+        "frequency_per_year": 0.15,
+        "expected_annual_loss": 45000000,
+        "recommendation": "NÊN — kiểm soát luồng duy nhất"
+      },
+      {
+        "name": "Giám sát (Prometheus + Grafana self-hosted)",
+        "implementation_cost": 5000000,
+        "annual_cost": 8000000,
+        "loss_single_incident": 200000000,
+        "frequency_per_year": 0.05,
+        "expected_annual_loss": 10000000,
+        "recommendation": "NÊN — nằm trong ngân sách 30M"
+      },
+      {
+        "name": "WAF thương mại (Cloudflare Pro)",
+        "implementation_cost": 0,
+        "annual_cost": 24000000,
+        "loss_single_incident": 100000000,
+        "frequency_per_year": 0.08,
+        "expected_annual_loss": 8000000,
+        "recommendation": "CÂN NHẮC — EAL thấp hơn chi phí, ưu tiên mạng trước"
+      },
+      {
+        "name": "SIEM thương mại (Splunk)",
+        "implementation_cost": 20000000,
+        "annual_cost": 80000000,
+        "loss_single_incident": 150000000,
+        "frequency_per_year": 0.03,
+        "expected_annual_loss": 4500000,
+        "recommendation": "KHÔNG NÊN — vượt ngân sách, dùng log Docker + Grafana"
+      }
+    ],
+    "formula": "EAL = loss_single_incident × frequency_per_year",
+    "total_control_cost_annual": 8000000,
+    "total_eal_without_controls": 107500000,
+    "roi_note": "Tổng chi phí kiểm soát ~8M/năm so với EAL ~107M/năm nếu không kiểm soát"
+  }
+}
