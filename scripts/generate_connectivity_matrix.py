@@ -15,7 +15,7 @@ NODES = ["dmz-web", "gateway-dmz-app", "app-api", "gateway-app-data", "data-db"]
 
 
 def main():
-    with open(POLICY) as f:
+    with open(POLICY, encoding="utf-8") as f:
         policy = yaml.safe_load(f)
 
     allowed = {}
@@ -37,7 +37,7 @@ def main():
                     matrix[src][dst] = "DENY"
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    with open(OUTPUT, "w") as f:
+    with open(OUTPUT, "w", encoding="utf-8") as f:
         json.dump({"matrix": matrix, "exceptions": policy.get("exceptions", [])}, f, indent=2)
     print(f"Generated: {OUTPUT}")
 

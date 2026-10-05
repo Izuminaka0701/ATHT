@@ -12,7 +12,7 @@ OUTPUT = ROOT / "evidence" / "flow-diagram.mmd"
 
 
 def main():
-    with open(COMPOSE) as f:
+    with open(COMPOSE, encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     services = data.get("services", {})

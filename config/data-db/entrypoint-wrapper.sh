@@ -1,7 +1,6 @@
 #!/bin/sh
 set -eu
 
-# Bind PostgreSQL chỉ trên IP miền DATA
 DATA_IP="$(hostname -i | awk '{print $1}')"
 
 echo "[data-db] listen_addresses=${DATA_IP}"

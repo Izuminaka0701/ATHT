@@ -8,9 +8,9 @@ RUN pip install --no-cache-dir \
     gunicorn==22.0.0
 
 COPY app.py entrypoint.sh ./
-RUN chmod +x entrypoint.sh
+RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 
 USER nobody
 EXPOSE 5000
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/bin/sh", "entrypoint.sh"]

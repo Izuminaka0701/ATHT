@@ -1,0 +1,78 @@
+# Chính sách mặc định: DENY ALL — ngoại lệ phải có lý do từng dòng
+default_action: DENY
+
+domains:
+  - name: net_dmz
+    trust_level: low
+    description: "Miền ngoài — tiếp xúc người dùng"
+  - name: net_app
+    trust_level: medium
+    description: "Miền ứng dụng — xử lý logic nghiệp vụ"
+  - name: net_data
+    trust_level: high
+    description: "Miền dữ liệu — tài sản quan trọng nhất"
+
+exceptions:
+  - id: EX-001
+    from: dmz-web
+    to: gateway-dmz-app
+    port: 8000
+    protocol: tcp
+    action: ALLOW
+    reason: "Luồng duy nhất từ DMZ sang APP — phải qua cổng kiểm soát HTTP"
+
+  - id: EX-002
+    from: gateway-dmz-app
+    to: app-api
+    port: 5000
+    protocol: tcp
+    action: ALLOW
+    reason: "Gateway proxy request đã lọc tới API (chỉ /health, /data)"
+
+  - id: EX-003
+    from: app-api
+    to: gateway-app-data
+    port: 5432
+    protocol: tcp
+    action: ALLOW
+    reason: "Luồng duy nhất từ APP sang DATA — phải qua cổng kiểm soát TCP"
+
+  - id: EX-004
+    from: gateway-app-data
+    to: data-db
+    port: 5432
+    protocol: tcp
+    action: ALLOW
+    reason: "Gateway forward kết nối PostgreSQL đã xác thực"
+
+  - id: EX-005
+    from: host
+    to: dmz-web
+    port: 8080
+    protocol: tcp
+    action: ALLOW
+    reason: "Truy cập người dùng nội bộ qua localhost — không expose 0.0.0.0"
+
+blocked_by_default:
+  - "Mọi kết nối liên miền không liền kề (dmz ↔ data)"
+  - "Mọi kết nối bỏ qua gateway (dmz → app-api trực tiếp)"
+  - "Mọi kết nối ngược chiều (data → app, app → dmz)"
+  - "Mọi port không liệt kê trong exceptions"
+
+defense_in_depth:
+  critical_asset: data-db
+  layers:
+    - layer: 1
+      name: "Cô lập mạng Docker (internal networks)"
+      protects: "Ngăn routing trực tiếp giữa miền"
+    - layer: 2
+      name: "Gateway proxy (gateway-dmz-app, gateway-app-data)"
+      protects: "Kiểm soát luồng duy nhất, lọc path/port"
+    - layer: 3
+      name: "pg_hba.conf + scram-sha-256"
+      protects: "Xác thực DB ngay cả khi lớp mạng bị vượt"
+  when_outer_breaks: |
+    Nếu container DMZ bị chiếm: kẻ tấn công chỉ ở net_dmz,
+    không route tới net_data. Gateway chỉ forward /health và /data.
+    DB vẫn yêu cầu scram-sha-256 + đúng user appuser.
+    Không đọc được dữ liệu nếu không có credential APP.

@@ -1,7 +1,6 @@
 #!/bin/sh
 set -eu
 
-# Bind chỉ trên IP của miền APP — resolve qua DNS Docker
 APP_IP="$(python3 -c "import socket; print(socket.gethostbyname('app-api'))")"
 export BIND_ADDRESS="${BIND_ADDRESS:-$APP_IP}"
 

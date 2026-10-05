@@ -1,0 +1,169 @@
+name: atht-topic-g
+services:
+  app-api:
+    build:
+      context: /mnt/d/Code/ATHT/config/app-api
+      dockerfile: Dockerfile
+    cap_drop:
+      - ALL
+    container_name: app-api
+    depends_on:
+      data-db:
+        condition: service_started
+        required: true
+      gateway-app-data:
+        condition: service_started
+        required: true
+    environment:
+      BIND_PORT: "5000"
+      DB_HOST: gateway-app-data
+      DB_NAME: appdb
+      DB_PASSWORD: lab_password_change_me
+      DB_PORT: "5432"
+      DB_USER: appuser
+    image: atht-app-api:1.0
+    networks:
+      net_app:
+        aliases:
+          - app-api
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+  data-db:
+    build:
+      context: /mnt/d/Code/ATHT/config/data-db
+      dockerfile: Dockerfile
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+    cap_drop:
+      - ALL
+    container_name: data-db
+    environment:
+      POSTGRES_DB: appdb
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      POSTGRES_PASSWORD: lab_password_change_me
+      POSTGRES_USER: appuser
+    image: atht-data-db:1.0
+    networks:
+      net_data:
+        aliases:
+          - data-db
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /var/lib/postgresql/data:uid=70,gid=70,mode=0700
+      - /var/run/postgresql
+      - /tmp
+  dmz-web:
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    cap_drop:
+      - ALL
+    container_name: dmz-web
+    depends_on:
+      gateway-dmz-app:
+        condition: service_started
+        required: true
+    image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+    networks:
+      net_dmz:
+        aliases:
+          - dmz-web
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 8080
+        published: "8080"
+        protocol: tcp
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /var/run
+      - /tmp
+    volumes:
+      - type: bind
+        source: /mnt/d/Code/ATHT/config/dmz-web/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /mnt/d/Code/ATHT/config/dmz-web/html
+        target: /usr/share/nginx/html
+        read_only: true
+        bind: {}
+  gateway-app-data:
+    build:
+      context: /mnt/d/Code/ATHT/config/gateway-app-data
+      dockerfile: Dockerfile
+    cap_drop:
+      - ALL
+    container_name: gateway-app-data
+    depends_on:
+      data-db:
+        condition: service_started
+        required: true
+    image: atht-gateway-app-data:1.0
+    networks:
+      net_app:
+        aliases:
+          - gateway-app-data
+      net_data:
+        aliases:
+          - gateway-app-data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+  gateway-dmz-app:
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    cap_drop:
+      - ALL
+    container_name: gateway-dmz-app
+    depends_on:
+      app-api:
+        condition: service_started
+        required: true
+    image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+    networks:
+      net_app:
+        aliases:
+          - gateway-dmz-app
+      net_dmz:
+        aliases:
+          - gateway-dmz-app
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /var/run
+      - /tmp
+    volumes:
+      - type: bind
+        source: /mnt/d/Code/ATHT/config/gateway-dmz-app/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind: {}
+networks:
+  net_app:
+    name: atht-topic-g_net_app
+    driver: bridge
+    internal: true
+  net_data:
+    name: atht-topic-g_net_data
+    driver: bridge
+    internal: true
+  net_dmz:
+    name: atht-topic-g_net_dmz
+    driver: bridge

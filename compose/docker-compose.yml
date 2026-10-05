@@ -14,7 +14,7 @@ networks:
 
 services:
   dmz-web:
-    image: nginx:1.27-alpine@sha256:a5127daff3d6f4606be3100a252419bfa84fd6ee5cd74d0feaca1a5068f97dcf
+    image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
     container_name: dmz-web
     networks:
       net_dmz:
@@ -24,27 +24,30 @@ services:
       - ../config/dmz-web/html:/usr/share/nginx/html:ro
     ports:
       - "127.0.0.1:8080:8080"
-    read_only: true
-    tmpfs: [/var/cache/nginx, /var/run, /tmp]
+    tmpfs: [/var/run, /tmp]
     security_opt: [no-new-privileges:true]
+    # nginx master chạy root: cần CHOWN (thư mục tạm) + SETUID/SETGID (hạ quyền worker).
+    # Cổng 8080/8000 > 1024 nên KHÔNG cần NET_BIND_SERVICE.
     cap_drop: [ALL]
-    cap_add: [NET_BIND_SERVICE]
+    cap_add: [CHOWN, SETUID, SETGID]
     restart: unless-stopped
+    depends_on: [gateway-dmz-app]
 
   gateway-dmz-app:
-    image: nginx:1.27-alpine@sha256:a5127daff3d6f4606be3100a252419bfa84fd6ee5cd74d0feaca1a5068f97dcf
+    image: nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
     container_name: gateway-dmz-app
     networks:
       net_dmz: {aliases: [gateway-dmz-app]}
       net_app: {aliases: [gateway-dmz-app]}
     volumes:
       - ../config/gateway-dmz-app/nginx.conf:/etc/nginx/nginx.conf:ro
-    read_only: true
-    tmpfs: [/var/cache/nginx, /var/run, /tmp]
+    tmpfs: [/var/run, /tmp]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
-    cap_add: [NET_BIND_SERVICE]
+    cap_add: [CHOWN, SETUID, SETGID]
     restart: unless-stopped
+    # nginx resolve "app-api" ngay lúc khởi động -> app-api phải tồn tại trước
+    depends_on: [app-api]
 
   app-api:
     build:
@@ -83,28 +86,29 @@ services:
     depends_on: [data-db]
 
   data-db:
-    image: postgres:16-alpine@sha256:8bfa8786de771893582a9a489b67775a51693f4e7408fbd251d843769cf87691
+    build:
+      context: ../config/data-db
+      dockerfile: Dockerfile
+    image: atht-data-db:1.0
     container_name: data-db
     networks:
       net_data: {aliases: [data-db]}
-    volumes:
-      - ../config/data-db/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-      - ../config/data-db/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
-      - ../config/data-db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-      - ../config/data-db/entrypoint-wrapper.sh:/entrypoint-wrapper.sh:ro
     environment:
       POSTGRES_DB: appdb
       POSTGRES_USER: appuser
       POSTGRES_PASSWORD: lab_password_change_me
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
-    entrypoint: ["/bin/sh", "/entrypoint-wrapper.sh"]
-    tmpfs: [/var/lib/postgresql/data, /var/run/postgresql, /tmp]
+    tmpfs:
+      - /var/lib/postgresql/data:uid=70,gid=70,mode=0700
+      - /var/run/postgresql
+      - /tmp
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID, DAC_OVERRIDE]
     restart: unless-stopped
 
   probe:
-    image: alpine:3.20
+    image: alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
     container_name: probe
     profiles: [test]
     networks:

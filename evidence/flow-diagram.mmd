@@ -1,0 +1,20 @@
+flowchart LR
+  subgraph DMZ["Miền DMZ (net_dmz)"]
+    dmz-web[dmz-web]
+  end
+  subgraph GW1["Cổng DMZ↔APP"]
+    gateway-dmz-app[gateway-dmz-app]
+  end
+  subgraph APP["Miền APP (net_app)"]
+    app-api[app-api]
+  end
+  subgraph GW2["Cổng APP↔DATA"]
+    gateway-app-data[gateway-app-data]
+  end
+  subgraph DATA["Miền DATA (net_data)"]
+    data-db[data-db]
+  end
+  dmz-web -->|HTTP :8000| gateway-dmz-app
+  gateway-dmz-app -->|HTTP :5000| app-api
+  app-api -->|TCP :5432| gateway-app-data
+  gateway-app-data -->|TCP :5432| data-db

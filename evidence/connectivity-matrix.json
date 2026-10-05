@@ -1,0 +1,86 @@
+{
+  "matrix": {
+    "dmz-web": {
+      "dmz-web": "SELF",
+      "gateway-dmz-app": "ALLOW",
+      "app-api": "DENY",
+      "gateway-app-data": "DENY",
+      "data-db": "DENY"
+    },
+    "gateway-dmz-app": {
+      "dmz-web": "DENY",
+      "gateway-dmz-app": "SELF",
+      "app-api": "ALLOW",
+      "gateway-app-data": "DENY",
+      "data-db": "DENY"
+    },
+    "app-api": {
+      "dmz-web": "DENY",
+      "gateway-dmz-app": "DENY",
+      "app-api": "SELF",
+      "gateway-app-data": "ALLOW",
+      "data-db": "DENY"
+    },
+    "gateway-app-data": {
+      "dmz-web": "DENY",
+      "gateway-dmz-app": "DENY",
+      "app-api": "DENY",
+      "gateway-app-data": "SELF",
+      "data-db": "ALLOW"
+    },
+    "data-db": {
+      "dmz-web": "DENY",
+      "gateway-dmz-app": "DENY",
+      "app-api": "DENY",
+      "gateway-app-data": "DENY",
+      "data-db": "SELF"
+    }
+  },
+  "exceptions": [
+    {
+      "id": "EX-001",
+      "from": "dmz-web",
+      "to": "gateway-dmz-app",
+      "port": 8000,
+      "protocol": "tcp",
+      "action": "ALLOW",
+      "reason": "Lu\u1ed3ng duy nh\u1ea5t t\u1eeb DMZ sang APP \u2014 ph\u1ea3i qua c\u1ed5ng ki\u1ec3m so\u00e1t HTTP"
+    },
+    {
+      "id": "EX-002",
+      "from": "gateway-dmz-app",
+      "to": "app-api",
+      "port": 5000,
+      "protocol": "tcp",
+      "action": "ALLOW",
+      "reason": "Gateway proxy request \u0111\u00e3 l\u1ecdc t\u1edbi API (ch\u1ec9 /health, /data)"
+    },
+    {
+      "id": "EX-003",
+      "from": "app-api",
+      "to": "gateway-app-data",
+      "port": 5432,
+      "protocol": "tcp",
+      "action": "ALLOW",
+      "reason": "Lu\u1ed3ng duy nh\u1ea5t t\u1eeb APP sang DATA \u2014 ph\u1ea3i qua c\u1ed5ng ki\u1ec3m so\u00e1t TCP"
+    },
+    {
+      "id": "EX-004",
+      "from": "gateway-app-data",
+      "to": "data-db",
+      "port": 5432,
+      "protocol": "tcp",
+      "action": "ALLOW",
+      "reason": "Gateway forward k\u1ebft n\u1ed1i PostgreSQL \u0111\u00e3 x\u00e1c th\u1ef1c"
+    },
+    {
+      "id": "EX-005",
+      "from": "host",
+      "to": "dmz-web",
+      "port": 8080,
+      "protocol": "tcp",
+      "action": "ALLOW",
+      "reason": "Truy c\u1eadp ng\u01b0\u1eddi d\u00f9ng n\u1ed9i b\u1ed9 qua localhost \u2014 kh\u00f4ng expose 0.0.0.0"
+    }
+  ]
+}

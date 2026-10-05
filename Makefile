@@ -1,7 +1,14 @@
 COMPOSE := compose/docker-compose.yml
 COMPOSE_DIR := compose
-PYTHON := python3
-PIP := pip3
+
+# Auto-detect python command (Windows: python, Linux/Mac: python3)
+ifeq ($(OS),Windows_NT)
+    PYTHON := python
+    PIP := pip
+else
+    PYTHON := python3
+    PIP := pip3
+endif
 
 .PHONY: preflight up attack defend verify export-evidence down pin-digests clean
 
@@ -13,7 +20,7 @@ preflight:
 	@$(PIP) install -q -r tests/requirements.txt
 	@echo "Preflight OK"
 
-up:
+up: pin-digests
 	docker compose -f $(COMPOSE) build
 	docker compose -f $(COMPOSE) up -d
 	@echo "Waiting for services..."
@@ -31,7 +38,7 @@ verify: export-evidence
 	@$(PYTHON) -m pytest tests/ -v --tb=short
 
 export-evidence:
-	@mkdir -p evidence
+	@$(PYTHON) -c "import os; os.makedirs('evidence', exist_ok=True)"
 	@$(PYTHON) scripts/generate_flow_diagram.py
 	@$(PYTHON) scripts/generate_connectivity_matrix.py
 	@$(PYTHON) scripts/export_config_evidence.py
@@ -43,7 +50,7 @@ down:
 	docker compose -f $(COMPOSE) down -v --remove-orphans
 
 pin-digests:
-	bash scripts/pin-digests.sh
+	@$(PYTHON) scripts/pin_digests.py
 
 clean: down
 	rm -rf evidence/*.mmd evidence/*.json evidence/*.yml evidence/MANIFEST.txt

@@ -13,7 +13,7 @@ BANNED = [
 ]
 
 ROOT = Path(__file__).resolve().parents[1]
-SKIP_DIRS = {".git", "__pycache__", ".pytest_cache", "node_modules"}
+SKIP_DIRS = {".git", "__pycache__", ".pytest_cache", "node_modules", ".venv"}
 
 
 def main():

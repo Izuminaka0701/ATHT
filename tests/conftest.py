@@ -1,8 +1,13 @@
 """Fixtures pytest — kiểm tra stack đang chạy trước khi test."""
 
 import subprocess
+import sys
+from pathlib import Path
 
 import pytest
+
+# Đảm bảo thư mục tests/ nằm trong sys.path để import helpers hoạt động
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 def _container_running(name: str) -> bool:

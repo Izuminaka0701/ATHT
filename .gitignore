@@ -5,3 +5,6 @@ __pycache__/
 *.key
 cosign.key
 .DS_Store
+.venv/
+evidence/config-before/
+evidence/config-after/
